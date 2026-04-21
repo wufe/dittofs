@@ -23,6 +23,7 @@ import (
 	pkgidentity "github.com/marmos91/dittofs/pkg/identity"
 	"github.com/marmos91/dittofs/pkg/metadata"
 	"github.com/marmos91/dittofs/pkg/metadata/lock"
+	"github.com/marmos91/dittofs/pkg/smbauth"
 )
 
 // Handler manages SMB2 protocol handling including session management,
@@ -147,6 +148,12 @@ type Handler struct {
 	// When false, guest session requests are rejected with STATUS_LOGON_FAILURE.
 	// Default: true.
 	GuestEnabled bool
+
+	// NTLMPasswordValidator is an optional custom NTLM credential validator.
+	// When set, it is called for every NTLM AUTHENTICATE message in place of the
+	// UserStore path. On success the returned session base key is used for signing.
+	// On failure STATUS_LOGON_FAILURE is returned (guest fallback is bypassed).
+	NTLMPasswordValidator smbauth.NTLMPasswordValidator
 
 	// DurableStore holds the durable handle persistence layer.
 	// When set, durable handles are persisted on disconnect and can be
@@ -348,7 +355,7 @@ func NewHandlerWithSessionManager(sessionManager *session.Manager) *Handler {
 		MaxWriteSize:            1048576, // 1MB
 		SigningConfig:           signing.DefaultSigningConfig(),
 		MinDialect:              types.Dialect0202,
-		MaxDialect:              types.Dialect0210, // Default to 2.1 until full SMB3 session/signing is implemented
+		MaxDialect:              types.Dialect0311,
 		EncryptionEnabled:       false,
 		DirectoryLeasingEnabled: true,
 		NtlmEnabled:             true,

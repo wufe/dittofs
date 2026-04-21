@@ -16,6 +16,7 @@ import (
 	"github.com/marmos91/dittofs/internal/logger"
 	"github.com/marmos91/dittofs/pkg/adapter"
 	"github.com/marmos91/dittofs/pkg/auth/kerberos"
+	"github.com/marmos91/dittofs/pkg/smbauth"
 	"github.com/marmos91/dittofs/pkg/controlplane/models"
 	"github.com/marmos91/dittofs/pkg/controlplane/runtime"
 	"github.com/marmos91/dittofs/pkg/metadata"
@@ -419,6 +420,13 @@ func (s *Adapter) preAcceptCheck(conn net.Conn) bool {
 // TCP connection. This implements the adapter.ConnectionFactory interface.
 func (s *Adapter) NewConnection(conn net.Conn) adapter.ConnectionHandler {
 	return NewConnection(s, conn)
+}
+
+// SetNTLMPasswordValidator injects a custom NTLM password validator.
+// When set, every NTLM AUTHENTICATE is validated against this instead of the UserStore.
+// Must be called before Serve().
+func (s *Adapter) SetNTLMPasswordValidator(v smbauth.NTLMPasswordValidator) {
+	s.handler.NTLMPasswordValidator = v
 }
 
 // SetKerberosProvider injects the shared Kerberos provider into the SMB handler.

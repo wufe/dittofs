@@ -413,6 +413,30 @@ func (h *Handler) completeNTLMAuth(ctx *SMBHandlerContext, securityBuffer []byte
 		"negotiateFlags", fmt.Sprintf("0x%08x", authMsg.NegotiateFlags),
 		"encryptedRandomSessionKeyLen", len(authMsg.EncryptedRandomSessionKey))
 
+	// Custom NTLM validator — takes priority over UserStore and guest fallback.
+	if h.NTLMPasswordValidator != nil {
+		sessionBaseKey, ok := h.NTLMPasswordValidator.ValidateNTLMv2(ctx.Context, authMsg.Username, authMsg.Domain, pending.ServerChallenge, authMsg.NtChallengeResponse)
+		if ok {
+			// When KEY_EXCH is negotiated (NTLMSSP_NEGOTIATE_KEY_EXCH, 0x40000000),
+			// the client RC4-encrypts a random ExportedSessionKey with the session base
+			// key and sends the ciphertext as EncryptedRandomSessionKey. All signing
+			// and encryption keys must be derived from the ExportedSessionKey, not the
+			// session base key — without this step the server and client derive keys
+			// from different material and every post-auth message fails signature check.
+			exportedKey := auth.DeriveSigningKey(sessionBaseKey, authMsg.NegotiateFlags, authMsg.EncryptedRandomSessionKey)
+			ctx.IsGuest = false
+			sess := h.CreateSessionWithID(pending.SessionID, pending.ClientAddr, false, authMsg.Username, authMsg.Domain)
+			if errResult := h.configureSessionSigningWithKey(sess, exportedKey[:], ctx); errResult != nil {
+				return errResult, nil
+			}
+			logger.Info("NTLM custom validator: authentication succeeded",
+				"sessionID", sess.SessionID, "username", authMsg.Username)
+			return h.buildAuthenticatedResponse(pending, exportedKey[:], authMsg.NegotiateFlags, sess.ShouldEncrypt()), nil
+		}
+		logger.Info("NTLM custom validator: authentication failed", "username", authMsg.Username)
+		return NewErrorResult(types.StatusLogonFailure), nil
+	}
+
 	// If anonymous authentication requested
 	if authMsg.IsAnonymous || authMsg.Username == "" {
 		if pending.IsReauth {
