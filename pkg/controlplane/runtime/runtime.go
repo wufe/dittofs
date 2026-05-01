@@ -205,6 +205,14 @@ func (r *Runtime) RegisterMetadataStore(name string, metaStore metadata.Metadata
 	return r.storesSvc.RegisterMetadataStore(name, metaStore)
 }
 
+// SwapMetadataStore atomically replaces the metadata store registered under
+// name and returns the displaced instance. Use this instead of
+// RegisterMetadataStore when the name is already registered (e.g. on share
+// re-mount). The caller owns closing the returned store if needed.
+func (r *Runtime) SwapMetadataStore(name string, newStore metadata.MetadataStore) (metadata.MetadataStore, error) {
+	return r.storesSvc.SwapMetadataStore(name, newStore)
+}
+
 func (r *Runtime) GetMetadataStore(name string) (metadata.MetadataStore, error) {
 	return r.storesSvc.GetMetadataStore(name)
 }
