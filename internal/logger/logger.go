@@ -200,6 +200,16 @@ func InitWithWriter(w io.Writer, level, format string, enableColor bool) {
 	}
 }
 
+// SetHandler replaces the active slog.Handler entirely, bypassing the built-in
+// text/JSON handlers. Call this to route dittofs logs through an external logger
+// (e.g. zerolog, zap). Level filtering becomes the responsibility of the provided handler.
+func SetHandler(h slog.Handler) {
+	mu.Lock()
+	defer mu.Unlock()
+	handler = h
+	slogger = slog.New(h)
+}
+
 // SetLevel sets the minimum log level
 func SetLevel(level string) {
 	switch strings.ToUpper(level) {
